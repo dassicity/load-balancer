@@ -41,9 +41,41 @@ func new_server(address string) *Server{
 	}
 }
 
+func New_Load_balancer(port string, servers []Server) *Load_Balancer{
+	return &Load_Balancer{
+		port: port,
+		round_robin_count: 0,
+		servers: servers,
+	}
+}
+
+func (lb *Load_Balancer) get_next_server() Server{
+	server := lb.servers[lb.round_robin_count % len(lb.servers)];
+	lb.round_robin_count++;
+	return *new_server(server.address);
+}
+
+func (lb *Load_Balancer) serve_proxy(rw http.ResponseWriter, r *http.Request){
+
+} 
+
 
 
 
 func main(){
-	fmt.Println("Hello");
+	servers := []Server{
+		*new_server("https://www.google.com"),
+		*new_server("https://www.bing.com"),
+		*new_server("https://www.duckduckgo.com"),
+	}
+
+	lb := New_Load_balancer("8000", servers);
+
+	handle_redirect := func(rw http.ResponseWriter, req *http.Request){
+		lb.serve_proxy(rw, req);
+	}
+
+	http.HandleFunc("/", handle_redirect);
+	fmt.Printf("Serving at 'Localhost: %s\n", lb.port);
+	http.ListenAndServe(":"+lb.port, nil);
 }
