@@ -30,6 +30,14 @@ func handle_error(err error){
 	}
 }
 
+func (s *Server) Address() string{return s.address}
+
+func (s *Server) Is_alive() bool{return true}
+
+func (s *Server) Serve(rw http.ResponseWriter, req *http.Request){
+	s.proxy.ServeHTTP(rw, req);
+}
+
 func new_server(address string) *Server{
 	server_url, err := url.Parse(address)
 
@@ -51,16 +59,21 @@ func New_Load_balancer(port string, servers []Server) *Load_Balancer{
 
 func (lb *Load_Balancer) get_next_server() Server{
 	server := lb.servers[lb.round_robin_count % len(lb.servers)];
+
+	if !server.Is_alive() {
+		lb.round_robin_count++;
+		server = lb.servers[lb.round_robin_count % len(lb.servers)];
+	}
 	lb.round_robin_count++;
-	return *new_server(server.address);
+
+	return server;
 }
 
-func (lb *Load_Balancer) serve_proxy(rw http.ResponseWriter, r *http.Request){
-
+func (lb *Load_Balancer) serve_proxy(rw http.ResponseWriter, req *http.Request){
+	target_server := lb.get_next_server();
+	fmt.Printf("Forwarding request to %q\n", target_server.Address());
+	target_server.Serve(rw, req);
 } 
-
-
-
 
 func main(){
 	servers := []Server{
