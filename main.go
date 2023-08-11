@@ -58,18 +58,24 @@ func New_Load_balancer(port string, servers []Server) *Load_Balancer{
 }
 
 func (lb *Load_Balancer) get_next_server() Server{
-	server := lb.servers[lb.round_robin_count % len(lb.servers)];
 
-	if !server.Is_alive() {
+	for i := 0; i < len(lb.servers); i++ {
+		server := &lb.servers[lb.round_robin_count%len(lb.servers)]
+
+		if server.Is_alive() {
+			lb.round_robin_count++;
+			return *server;
+		}
+
 		lb.round_robin_count++;
-		server = lb.servers[lb.round_robin_count % len(lb.servers)];
 	}
-	lb.round_robin_count++;
 
-	return server;
+	// Fallback to the last server if none are alive
+	return lb.servers[len(lb.servers)-1]
 }
 
 func (lb *Load_Balancer) serve_proxy(rw http.ResponseWriter, req *http.Request){
+	// fmt.Println("Here");
 	target_server := lb.get_next_server();
 	fmt.Printf("Forwarding request to %q\n", target_server.Address());
 	target_server.Serve(rw, req);
@@ -83,12 +89,14 @@ func main(){
 	}
 
 	lb := New_Load_balancer("8000", servers);
+	fmt.Println(lb.round_robin_count);
 
 	handle_redirect := func(rw http.ResponseWriter, req *http.Request){
+		// fmt.Println("Here");
 		lb.serve_proxy(rw, req);
 	}
 
 	http.HandleFunc("/", handle_redirect);
-	fmt.Printf("Serving at 'Localhost: %s\n", lb.port);
+	fmt.Printf("Serving at 'Localhost: %s'\n", lb.port);
 	http.ListenAndServe(":"+lb.port, nil);
 }
